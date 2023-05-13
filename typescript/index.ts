@@ -1,6 +1,7 @@
-import { LogLevel, Player, PlayerConfig, SourceConfig } from 'bitmovin-player/modules/bitmovinplayer-core';
+import { LogLevel, Player, PlayerConfig, PlayerEvent, SegmentPlaybackEvent, SourceConfig } from 'bitmovin-player/modules/bitmovinplayer-core';
 import PolyfillModule from 'bitmovin-player/modules/bitmovinplayer-polyfill';
 import EngineBitmovinModule from 'bitmovin-player/modules/bitmovinplayer-engine-bitmovin';
+import EngineNative from 'bitmovin-player/modules/bitmovinplayer-engine-native';
 import MseRendererModule from 'bitmovin-player/modules/bitmovinplayer-mserenderer';
 import HlsModule from 'bitmovin-player/modules/bitmovinplayer-hls';
 import XmlModule from 'bitmovin-player/modules/bitmovinplayer-xml';
@@ -27,6 +28,7 @@ Player.addModule(ContainerMp4Module);
 Player.addModule(SubtitlesModule);
 Player.addModule(SubtitlesCEA608Module);
 Player.addModule(StyleModule);
+Player.addModule(EngineNative);
 
 const conf: PlayerConfig = {
   key: "YOUR-KEY-HERE",
@@ -34,6 +36,9 @@ const conf: PlayerConfig = {
     level: LogLevel.DEBUG
   },
   ui: false,
+  tweaks: {
+    native_hls_parsing: true,
+  }
 };
 
 const player = new Player(document.getElementById("player"), conf);
@@ -41,10 +46,60 @@ const player = new Player(document.getElementById("player"), conf);
 const uiManager = UIFactory.buildDefaultUI(player);
 
 const source: SourceConfig = {
-  title: "Art of Motion",
-  dash: "https://bitmovin-a.akamaihd.net/content/MI201109210084_1/mpds/f08e80da-bf1d-4e3d-8899-f0f6155f6efa.mpd",
-  hls: "https://bitmovin-a.akamaihd.net/content/MI201109210084_1/m3u8s/f08e80da-bf1d-4e3d-8899-f0f6155f6efa.m3u8",
+  hls: "http://localhost:8090/index.m3u8",
 };
 
+player.on(PlayerEvent.Paused, () => {
+  console.log("Player is paused!");
+});
+
+const formatTime = (time: number) => {
+  const timeFormatted = (Math.round(time * 100) / 100).toFixed(2);
+  return timeFormatted;
+}
+
+let program_data_time_minus_playback_time = 0;  // in seconds
+
+player.on(PlayerEvent.SegmentPlayback, (event ) => {
+  console.log("PlayTime: " + formatTime(player.getCurrentTime()) + " SegmentPlayback: " + JSON.stringify(event));
+  const segmentPlaybackEvent = event as SegmentPlaybackEvent;
+  const playbackTime = segmentPlaybackEvent.playbackTime;  // in seconds
+  const dateTime = segmentPlaybackEvent.dateTime;
+  if (dateTime) {
+    const date = new Date(dateTime);
+    program_data_time_minus_playback_time = date.getTime() / 1000 - playbackTime;
+  }
+});
+
+player.on(PlayerEvent.SourceLoaded, () => {
+  console.log("SourceLoaded!");
+  const currentTimeDisplay = document.getElementById('timeCode');
+
+  setInterval(() => {
+    const playtime = player.getCurrentTime(); // in seconds (float)
+    const currentTime = playtime + program_data_time_minus_playback_time; // in seconds (float)
+    // const currentTimeRounded = currentTime % 30; // round to 30 seconds
+    // const currentTimeRoundedMS = currentTimeRounded * 1000; // round to 30 seconds
+    // const currentFrameNumber = Math.ceil((currentTimeRoundedMS + 20) / 40) + 1; // 25 fps 
+    // const currentTimeRoundedCorrectedMS = currentFrameNumber * 40; // in ms 
+    // const currentTimeRoundedCorrected = currentTimeRoundedCorrectedMS / 1000; // in ms 
+
+    // const currentTimeRoundedFormatted = formatTime(currentTimeRounded);
+    // const currentTimeRoundedCorrectedFormatted = formatTime(currentTimeRoundedCorrected);
+
+    // currentTimeDisplay.innerHTML = currentTimeRoundedFormatted + " <br/> FrameTime: " + currentTimeRoundedCorrectedFormatted;
+    
+    const timeInMinute = currentTime % 60; // round to 60 seconds
+    const currentSecond = Math.floor(timeInMinute);
+    const currentFraction = timeInMinute - currentSecond; // in seconds
+    const currentFrame =  Math.floor(currentFraction * 60) // 60 fps 
+    const secondAndFrame = currentSecond.toString().padStart(2, '0') + ":" + 
+                           currentFrame.toString().padStart(2, '0');
+
+    const timeInMinuteFormatted = formatTime(timeInMinute);
+
+    currentTimeDisplay.innerHTML = timeInMinuteFormatted + " <br/> Second:Frame: " + secondAndFrame;
+  }, 5);
+});
 
 player.load(source);
