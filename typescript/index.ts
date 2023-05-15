@@ -74,25 +74,15 @@ player.on(PlayerEvent.SegmentPlayback, (event ) => {
 player.on(PlayerEvent.SourceLoaded, () => {
   console.log("SourceLoaded!");
   const currentTimeDisplay = document.getElementById('timeCode');
+  const frameRateFps = 60;
 
   setInterval(() => {
     const playtime = player.getCurrentTime(); // in seconds (float)
-    const currentTime = playtime + program_data_time_minus_playback_time; // in seconds (float)
-    // const currentTimeRounded = currentTime % 30; // round to 30 seconds
-    // const currentTimeRoundedMS = currentTimeRounded * 1000; // round to 30 seconds
-    // const currentFrameNumber = Math.ceil((currentTimeRoundedMS + 20) / 40) + 1; // 25 fps 
-    // const currentTimeRoundedCorrectedMS = currentFrameNumber * 40; // in ms 
-    // const currentTimeRoundedCorrected = currentTimeRoundedCorrectedMS / 1000; // in ms 
-
-    // const currentTimeRoundedFormatted = formatTime(currentTimeRounded);
-    // const currentTimeRoundedCorrectedFormatted = formatTime(currentTimeRoundedCorrected);
-
-    // currentTimeDisplay.innerHTML = currentTimeRoundedFormatted + " <br/> FrameTime: " + currentTimeRoundedCorrectedFormatted;
-    
-    const timeInMinute = currentTime % 60; // round to 60 seconds
+    const currentProgramTime = playtime + program_data_time_minus_playback_time; // in seconds (float) 
+    const timeInMinute = currentProgramTime % 60; // crop to last started minute (float)
     const currentSecond = Math.floor(timeInMinute);
     const currentFraction = timeInMinute - currentSecond; // in seconds
-    const currentFrame =  Math.floor(currentFraction * 60) // 60 fps 
+    const currentFrame =  Math.floor(currentFraction * frameRateFps)
     const secondAndFrame = currentSecond.toString().padStart(2, '0') + ":" + 
                            currentFrame.toString().padStart(2, '0');
 
